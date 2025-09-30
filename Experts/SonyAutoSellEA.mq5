@@ -6,7 +6,7 @@
 
 // Logger (optional) - disabled by default to avoid include errors
 #define USE_HTTP_LOGGER 0
-#if USE_HTTP_LOGGER
+#if defined(USE_HTTP_LOGGER) && (USE_HTTP_LOGGER == 1)
 #include <SonyTradeLogger.mqh>
 #endif
 
@@ -34,7 +34,7 @@ bool sequence_active = false;
 datetime last_trade_time = 0;
 const int TRADE_COOLDOWN_SECONDS = 5; // Wait 5 seconds after a trade attempt
 
-#if USE_HTTP_LOGGER
+#if defined(USE_HTTP_LOGGER) && (USE_HTTP_LOGGER == 1)
 SonyTradeLogger logger(TradeLogAPI_URL, WebRequestTimeout);
 #endif
 
@@ -373,7 +373,7 @@ void OnTradeClose(ulong ticket)
   datetime close_t = TimeCurrent();
   double profit = PositionGetDouble(POSITION_PROFIT);
 
-#if USE_HTTP_LOGGER
+#if defined(USE_HTTP_LOGGER) && (USE_HTTP_LOGGER == 1)
   logger.LogTrade(type, lots, symbol, open_p, open_t, close_p, close_t, profit);
 #endif
 }
