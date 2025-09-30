@@ -1,2 +1,2 @@
-Experts/*.ex5
-Logs/
+*.ex5
+Logs/*
