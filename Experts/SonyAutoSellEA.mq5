@@ -4,12 +4,8 @@
 #property strict
 #property version "1.00"
 
-// Logger (optional) - disabled by default to avoid include errors
-#define USE_HTTP_LOGGER 0
-#if defined(USE_HTTP_LOGGER) && (USE_HTTP_LOGGER == 1)
+// Logger include (always enabled)
 #include <SonyTradeLogger.mqh>
-#endif
-
 //--- Inputs Https server api
 input string TradeLogAPI_URL = "https://your-server.com/api/save_trade";
 input int WebRequestTimeout = 10000;
@@ -34,9 +30,7 @@ bool sequence_active = false;
 datetime last_trade_time = 0;
 const int TRADE_COOLDOWN_SECONDS = 5; // Wait 5 seconds after a trade attempt
 
-#if defined(USE_HTTP_LOGGER) && (USE_HTTP_LOGGER == 1)
 SonyTradeLogger logger(TradeLogAPI_URL, WebRequestTimeout);
-#endif
 
 struct Stats
 {
@@ -373,9 +367,7 @@ void OnTradeClose(ulong ticket)
   datetime close_t = TimeCurrent();
   double profit = PositionGetDouble(POSITION_PROFIT);
 
-#if defined(USE_HTTP_LOGGER) && (USE_HTTP_LOGGER == 1)
   logger.LogTrade(type, lots, symbol, open_p, open_t, close_p, close_t, profit);
-#endif
 }
 
 //+------------------------------------------------------------------+

@@ -4,12 +4,8 @@
 #property strict
 #property version "1.00"
 
-// Logger toggle (disabled by default; set to 1 to enable HTTP logging)
-#define USE_HTTP_LOGGER 0
-#if defined(USE_HTTP_LOGGER) && (USE_HTTP_LOGGER == 1)
+// Logger include (always enabled)
 #include <SonyTradeLogger.mqh>
-#endif
-
 //--- Inputs Https server api
 input string TradeLogAPI_URL = "https://your-server.com/api/save_trade";
 input int WebRequestTimeout = 10000;
@@ -45,9 +41,7 @@ SideState sellState = {0.0, false, 0};
 
 const int TRADE_COOLDOWN_SECONDS = 5; // Wait 5 seconds after a trade attempt
 
-#if defined(USE_HTTP_LOGGER) && (USE_HTTP_LOGGER == 1)
 SonyTradeLogger logger(TradeLogAPI_URL, WebRequestTimeout);
-#endif
 
 struct Stats
 {
@@ -267,6 +261,14 @@ void CloseAllBuys(ulong magic)
             OnTradeClose(position_ticket);
         }
     }
+    // Reset BUY-side runtime state so EA can start a fresh sequence
+    if (magic == MagicNumberBuy)
+    {
+        buyState.sequence_active = false;
+        buyState.last_entry_price = 0.0;
+        // Nudge last_trade_time back so ManageLayers can immediately open a new starter position
+        buyState.last_trade_time = TimeCurrent() - TRADE_COOLDOWN_SECONDS;
+    }
 }
 
 void CloseAllSells(ulong magic)
@@ -305,6 +307,14 @@ void CloseAllSells(ulong magic)
             OnTradeClose(position_ticket);
         }
     }
+    // Reset SELL-side runtime state so EA can start a fresh sequence
+    if (magic == MagicNumberSell)
+    {
+        sellState.sequence_active = false;
+        sellState.last_entry_price = 0.0;
+        // Nudge last_trade_time back so ManageLayers can immediately open a new starter position
+        sellState.last_trade_time = TimeCurrent() - TRADE_COOLDOWN_SECONDS;
+    }
 }
 
 void CheckProfitAndClose(const Stats &s, bool forBuy, ulong magic)
@@ -329,11 +339,19 @@ void CloseWhenSinglePositionProfit(Stats &s, bool forBuy, ulong magic)
         return;
     double current_balance = AccountInfoDouble(ACCOUNT_BALANCE);
     double target_amount = current_balance * 0.01; // 1% of balance
-    double profitLotsize = s.lastVol * 10;         // keep original behavior
-    if (s.floatingProfit >= profitLotsize)
+    // Convert "10 times lotsize" into a currency target using the symbol tick value
+    double tick_value = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
+    if (tick_value <= 0.0)
+        tick_value = 0.0;                                         // guard
+    double profitLotsizeCurrency = s.lastVol * 10.0 * tick_value; // approximate currency value
+
+    // Use whichever target is larger: 1% balance or lotsize-derived currency target
+    double effective_target = MathMax(target_amount, profitLotsizeCurrency);
+
+    if (s.floatingProfit >= effective_target)
     {
         Print("TARGET HIT: Floating Profit ($", DoubleToString(s.floatingProfit, 2),
-              ") >= Target Amount ($", DoubleToString(target_amount, 2), ")");
+              ") >= Effective Target ($", DoubleToString(effective_target, 2), ")");
         if (forBuy)
             CloseAllBuys(magic);
         else
@@ -355,9 +373,7 @@ void OnTradeClose(ulong ticket)
     datetime close_t = TimeCurrent();
     double profit = PositionGetDouble(POSITION_PROFIT);
 
-#if defined(USE_HTTP_LOGGER) && (USE_HTTP_LOGGER == 1)
     logger.LogTrade(type, lots, symbol, open_p, open_t, close_p, close_t, profit);
-#endif
 }
 
 //+------------------------------------------------------------------+
