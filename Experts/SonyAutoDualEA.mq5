@@ -199,12 +199,13 @@ bool OpenSell(double volume, ulong magic)
     r.type = ORDER_TYPE_SELL;
     r.volume = volume;
     r.price = bid;
-    r.deviation = Slippage;
+    r.deviation = SmartDeviationPoints(_Symbol, 10, 3.0);
     r.magic = magic;
     r.type_filling = ORDER_FILLING_FOK;
 
     if (!OrderSend(r, res))
     {
+        Print("OPEN SELL ERROR 1: retcode_ex: ", res.retcode_external, " err: ", GetLastError());
         ResetLastError();
         ZeroMemory(r);
         ZeroMemory(res);
@@ -217,12 +218,31 @@ bool OpenSell(double volume, ulong magic)
         r.magic = magic;
         r.type_filling = ORDER_FILLING_IOC;
         if (!OrderSend(r, res))
+        {
+            Print("OPEN SELL ERROR 2: retcode: ", res.retcode, " err: ", GetLastError());
             return false;
+        }
     }
     if (res.retcode != TRADE_RETCODE_DONE && res.retcode != TRADE_RETCODE_DONE_PARTIAL)
+    {
+        Print("OPEN SELL ERROR 2: ", res.retcode);
         return false;
+    }
     Print("Opened SELL ", DoubleToString(volume, 2), " @ ", DoubleToString(res.price, _Digits));
     return true;
+}
+
+int SmartDeviationPoints(string symbol, int min_points = 10, double spread_multiplier = 3.0)
+{
+   double point  = SymbolInfoDouble(symbol, SYMBOL_POINT);
+   double bid    = SymbolInfoDouble(symbol, SYMBOL_BID);
+   double ask    = SymbolInfoDouble(symbol, SYMBOL_ASK);
+   if(point <= 0.0 || bid <= 0.0 || ask <= 0.0)
+      return min_points; // fallback
+
+   int spread_pts = (int)MathRound((ask - bid) / point);
+   int dev        = (int)MathMax(min_points, spread_pts * spread_multiplier);
+   return dev;
 }
 
 void CloseAllBuys(ulong magic)
@@ -484,11 +504,13 @@ void OnTick()
                 double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
                 double adverse_threshold = StepsPerLayer;
                 double adverse_movement = ask - sellState.last_entry_price;
+                 
                 if (adverse_movement >= adverse_threshold)
                 {
                     double nv = NextVolume(s);
                     if (CanOpen(s, nv))
                     {
+                        Print("can open SELL:");
                         sellState.last_trade_time = TimeCurrent();
                         OpenSell(nv, MagicNumberSell);
                     }
