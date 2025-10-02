@@ -345,7 +345,8 @@ void CheckProfitAndClose(const Stats &s, bool forBuy, ulong magic)
     if (s.floatingProfit >= target)
     {
         Print("TARGET HIT profit=", DoubleToString(s.floatingProfit, 2),
-              " target=", DoubleToString(target, 2));
+              " target=", DoubleToString(target, 2),
+              " TOTAL_INVEST=", DoubleToString(s.totalInvested, 2));
         if (forBuy)
             CloseAllBuys(magic);
         else
@@ -475,7 +476,7 @@ void OnTick()
                         OpenBuy(nv, MagicNumberBuy);
                     }
                 }
-                CloseWhenSinglePositionProfit(s, true, MagicNumberBuy);
+                //CloseWhenSinglePositionProfit(s, true, MagicNumberBuy);
                 CheckProfitAndClose(s, true, MagicNumberBuy);
             }
         }
@@ -515,7 +516,7 @@ void OnTick()
                         OpenSell(nv, MagicNumberSell);
                     }
                 }
-                CloseWhenSinglePositionProfit(s, false, MagicNumberSell);
+                //CloseWhenSinglePositionProfit(s, false, MagicNumberSell);
                 CheckProfitAndClose(s, false, MagicNumberSell);
             }
         }
