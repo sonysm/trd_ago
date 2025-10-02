@@ -234,15 +234,15 @@ bool OpenSell(double volume, ulong magic)
 
 int SmartDeviationPoints(string symbol, int min_points = 10, double spread_multiplier = 3.0)
 {
-   double point  = SymbolInfoDouble(symbol, SYMBOL_POINT);
-   double bid    = SymbolInfoDouble(symbol, SYMBOL_BID);
-   double ask    = SymbolInfoDouble(symbol, SYMBOL_ASK);
-   if(point <= 0.0 || bid <= 0.0 || ask <= 0.0)
-      return min_points; // fallback
+    double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+    double bid = SymbolInfoDouble(symbol, SYMBOL_BID);
+    double ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
+    if (point <= 0.0 || bid <= 0.0 || ask <= 0.0)
+        return min_points; // fallback
 
-   int spread_pts = (int)MathRound((ask - bid) / point);
-   int dev        = (int)MathMax(min_points, spread_pts * spread_multiplier);
-   return dev;
+    int spread_pts = (int)MathRound((ask - bid) / point);
+    int dev = (int)MathMax(min_points, spread_pts * spread_multiplier);
+    return dev;
 }
 
 void CloseAllBuys(ulong magic)
@@ -341,16 +341,36 @@ void CheckProfitAndClose(const Stats &s, bool forBuy, ulong magic)
 {
     if (s.count == 0)
         return;
-    double target = s.totalInvested * (ProfitTargetPercent / 100.0);
-    if (s.floatingProfit >= target)
+
+    /// ---------OLD---------///
+    // double target = s.totalInvested * (ProfitTargetPercent / 100.0);
+    // if (s.floatingProfit >= target)
+    // {
+    //     Print("TARGET HIT profit=", DoubleToString(s.floatingProfit, 2),
+    //           " target=", DoubleToString(target, 2),
+    //           " TOTAL_INVEST=", DoubleToString(s.totalInvested, 2));
+    //     if (forBuy)
+    //         CloseAllBuys(magic);
+    //     else
+    //         CloseAllSells(magic);
+    // }
+
+    /// --------- OLD ----------- ////
+
+    // news stragtegy
+
+    double invested = 0.0, profit = 0.0;
+    int cnt = 0;
+    bool isProfit = false;
+    GetAllInvestStatus(invested, profit, cnt, isProfit);
+
+    if (isProfit)
     {
-        Print("TARGET HIT profit=", DoubleToString(s.floatingProfit, 2),
-              " target=", DoubleToString(target, 2),
-              " TOTAL_INVEST=", DoubleToString(s.totalInvested, 2));
-        if (forBuy)
-            CloseAllBuys(magic);
-        else
-            CloseAllSells(magic);
+        if (profit == BaseLots * 10)
+        {
+            CloseAllBuys(MagicNumberBuy);
+            CloseAllSells(MagicNumberSell);
+        }
     }
 }
 
@@ -378,6 +398,18 @@ void CloseWhenSinglePositionProfit(Stats &s, bool forBuy, ulong magic)
         else
             CloseAllSells(magic);
     }
+}
+
+void GetAllInvestStatus(double &totalInvested, double &floatingProfit, int &positionsCount, bool &isProfit)
+{
+    Stats sb, ss;
+    CollectStats(sb, true, MagicNumberBuy);
+    CollectStats(ss, false, MagicNumberSell);
+
+    positionsCount = sb.count + ss.count;
+    totalInvested = sb.totalInvested + ss.totalInvested;
+    floatingProfit = sb.floatingProfit + ss.floatingProfit;
+    isProfit = (floatingProfit >= 0.0);
 }
 
 //--- Example function: log trade on position close
@@ -476,7 +508,7 @@ void OnTick()
                         OpenBuy(nv, MagicNumberBuy);
                     }
                 }
-                //CloseWhenSinglePositionProfit(s, true, MagicNumberBuy);
+                // CloseWhenSinglePositionProfit(s, true, MagicNumberBuy);
                 CheckProfitAndClose(s, true, MagicNumberBuy);
             }
         }
@@ -505,7 +537,7 @@ void OnTick()
                 double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
                 double adverse_threshold = StepsPerLayer;
                 double adverse_movement = ask - sellState.last_entry_price;
-                 
+
                 if (adverse_movement >= adverse_threshold)
                 {
                     double nv = NextVolume(s);
@@ -516,7 +548,7 @@ void OnTick()
                         OpenSell(nv, MagicNumberSell);
                     }
                 }
-                //CloseWhenSinglePositionProfit(s, false, MagicNumberSell);
+                // CloseWhenSinglePositionProfit(s, false, MagicNumberSell);
                 CheckProfitAndClose(s, false, MagicNumberSell);
             }
         }
