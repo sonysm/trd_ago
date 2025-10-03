@@ -362,13 +362,17 @@ void CheckProfitAndClose(const Stats &s, bool forBuy, ulong magic)
 
     if (isProfit && cnt <= 2)
     {
-        // 4.up $ it mean 4-5 times if 5 up mean must cnt bigger then 2
-        if (profit >= 4)
+        // moment 4 times profit of lotsize
+        // if 5 times other will create new record
+        double tg = 4.5 * BaseLots * 100;
+        if (profit >= tg)
         {
             CloseAllBuys(magic);
             CloseAllSells(magic);
             // Reset data
             InitMaxLostProfit();
+            
+            return;
         }
     }
 
@@ -488,7 +492,7 @@ void checkMaxLostProfit()
     // Track worst floating P/L (most negative)
     if (fpl < g_min_floating_pl)
         g_min_floating_pl = fpl;
-        PrintFormat("Max float profit lost=%.2f", g_min_floating_pl);
+        //PrintFormat("Max float profit lost=%.2f", g_min_floating_pl);
 
     // Optional: print occasionally
     // PrintFormat("FPL=%.2f, MaxDD=%.2f, MinFPL=%.2f", fpl, g_max_drawdown, g_min_floating_pl);
