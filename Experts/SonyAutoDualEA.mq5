@@ -255,6 +255,12 @@ int SmartDeviationPoints(string symbol, int min_points = 10, double spread_multi
 
 void CloseAll()
 {
+   // Hold new Position BUY temp
+   buyState.sequence_active = true;
+   
+   // Hold new Position SELL temp
+   sellState.sequence_active = true;
+   
     int total = PositionsTotal();
     for (int i = total - 1; i >= 0; --i)
     {
@@ -273,7 +279,7 @@ void CloseAll()
         double vol = PositionGetDouble(POSITION_VOLUME);
         double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
         
-        ENUM_POSITION_TYPE position_type = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
+        long position_type = PositionGetInteger(POSITION_TYPE);
 
         MqlTradeRequest r;
         MqlTradeResult res;
@@ -295,21 +301,17 @@ void CloseAll()
     } // for loop positions
     
     // Reset BUY-side runtime state so EA can start a fresh sequence
-    if (position_type == POSITION_TYPE_BUY)
-    {
-        buyState.sequence_active = false;
-        buyState.last_entry_price = 0.0;
-        // Nudge last_trade_time back so ManageLayers can immediately open a new starter position
-        buyState.last_trade_time = TimeCurrent() - TRADE_COOLDOWN_SECONDS;
+    buyState.sequence_active = false;
+    buyState.last_entry_price = 0.0;
+    // Nudge last_trade_time back so ManageLayers can immediately open a new starter position
+    buyState.last_trade_time = TimeCurrent() - TRADE_COOLDOWN_SECONDS;
         
-    } else // Reset SEL-side runtime 
-    {
-         sellState.sequence_active = false;
-         sellState.last_entry_price = 0.0;
-         // Nudge last_trade_time back so ManageLayers can immediately open a new starter position
-         sellState.last_trade_time = TimeCurrent() - TRADE_COOLDOWN_SECONDS;     
+     // Reset SEL-side runtime 
+     sellState.sequence_active = false;
+     sellState.last_entry_price = 0.0;
+     // Nudge last_trade_time back so ManageLayers can immediately open a new starter position
+     sellState.last_trade_time = TimeCurrent() - TRADE_COOLDOWN_SECONDS;  
     
-    }
 }
 
 void CloseAllBuys(ulong magic)
