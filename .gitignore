@@ -2,3 +2,6 @@
 Logs/*
 Profiles/*
 Profiles/Tester/*
+
+*.dat
+*/experts.dat
