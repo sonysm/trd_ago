@@ -30,6 +30,8 @@ input ulong MagicNumberBuy = 2025091901;
 input ulong MagicNumberSell = 2025091902;
 
 // Global ------
+long accountId = (long)AccountInfoInteger(ACCOUNT_LOGIN);
+
 // Globals
 double g_equity_peak = 0.0;
 double g_max_drawdown = 0.0;    // in account currency
@@ -132,7 +134,7 @@ void CollectStats(Stats &s, bool forBuy, ulong magic)
 double NextVolume(const Stats &s)
 {
 
-    if (s.count <= 1)
+    if (s.count <= 2)
     {
         return BaseLots;
     }
@@ -497,6 +499,32 @@ void checkMaxLostProfit()
 
     // Optional: print occasionally
     // PrintFormat("FPL=%.2f, MaxDD=%.2f, MinFPL=%.2f", fpl, g_max_drawdown, g_min_floating_pl);
+}
+
+string Key(string name, long magic)
+{
+    return StringFormat("%s|%I64d|%s|%I64d",
+                        MQLInfoString(MQL_PROGRAM_NAME), AccountInfoInteger(ACCOUNT_LOGIN), _Symbol, magic) +
+           "|" + name;
+}
+
+void SaveState(long magic, double equity_peak, double worst_fpl)
+{
+    GlobalVariableSet(Key("equity_peak", magic), equity_peak);
+    GlobalVariableSet(Key("worst_fpl", magic), worst_fpl);
+}
+
+bool LoadState(long magic, double &equity_peak, double &worst_fpl)
+{
+    bool ok = true;
+    double v;
+    ok &= GlobalVariableGet(Key("equity_peak", magic), v);
+    if (ok)
+        equity_peak = v;
+    ok &= GlobalVariableGet(Key("worst_fpl", magic), v);
+    if (ok)
+        worst_fpl = v;
+    return ok;
 }
 
 //+------------------------------------------------------------------+
