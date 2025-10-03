@@ -47,7 +47,7 @@ struct SideState
 SideState buyState = {0.0, false, 0};
 SideState sellState = {0.0, false, 0};
 
-const int TRADE_COOLDOWN_SECONDS = 5; // Wait 5 seconds after a trade attempt
+const int TRADE_COOLDOWN_SECONDS = 2; // Wait 5 seconds after a trade attempt
 
 SonyTradeLogger logger(TradeLogAPI_URL, WebRequestTimeout);
 
@@ -176,7 +176,7 @@ bool OpenBuy(double volume, ulong magic)
         r.type = ORDER_TYPE_BUY;
         r.volume = volume;
         r.price = ask;
-        r.deviation = Slippage;
+        r.deviation = SmartDeviationPoints(_Symbol);
         r.magic = magic;
         r.type_filling = ORDER_FILLING_IOC;
         if (!OrderSend(r, res))
@@ -206,7 +206,7 @@ bool OpenSell(double volume, ulong magic)
     r.type = ORDER_TYPE_SELL;
     r.volume = volume;
     r.price = bid;
-    r.deviation = SmartDeviationPoints(_Symbol, 10, 3.0);
+    r.deviation = SmartDeviationPoints(_Symbol);
     r.magic = magic;
     r.type_filling = ORDER_FILLING_FOK;
 
@@ -222,7 +222,7 @@ bool OpenSell(double volume, ulong magic)
         r.type = ORDER_TYPE_SELL;
         r.volume = volume;
         r.price = bid;
-        r.deviation = Slippage;
+        r.deviation = SmartDeviationPoints(_Symbol);
         r.magic = magic;
         r.type_filling = ORDER_FILLING_IOC;
         if (!OrderSend(r, res))
@@ -253,6 +253,65 @@ int SmartDeviationPoints(string symbol, int min_points = 10, double spread_multi
     return dev;
 }
 
+void CloseAll()
+{
+    int total = PositionsTotal();
+    for (int i = total - 1; i >= 0; --i)
+    {
+        ulong position_ticket = PositionGetTicket(i);
+        if (!PositionSelectByTicket(position_ticket))
+            continue;
+        
+        // not my record
+        long magic = PositionGetInteger(POSITION_MAGIC);
+        if (magic != (long)MagicNumberBuy && magic != (long)MagicNumberSell)
+            continue;
+         
+        if (PositionGetString(POSITION_SYMBOL) != _Symbol)
+            continue;
+
+        double vol = PositionGetDouble(POSITION_VOLUME);
+        double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+        
+        ENUM_POSITION_TYPE position_type = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
+
+        MqlTradeRequest r;
+        MqlTradeResult res;
+        ZeroMemory(r);
+        ZeroMemory(res);
+        r.action = TRADE_ACTION_DEAL;
+        r.symbol = _Symbol;
+        r.type = position_type == POSITION_TYPE_BUY ? ORDER_TYPE_SELL : ORDER_TYPE_BUY;
+        r.position = position_ticket;
+        r.volume = vol;
+        r.price = bid;
+        r.deviation = SmartDeviationPoints(_Symbol);
+        r.magic = magic;
+        if (OrderSend(r, res))
+        {
+            Print("Closed BUY ticket ", position_ticket);
+            OnTradeClose(position_ticket);
+        }
+    } // for loop positions
+    
+    // Reset BUY-side runtime state so EA can start a fresh sequence
+    if (position_type == POSITION_TYPE_BUY)
+    {
+        buyState.sequence_active = false;
+        buyState.last_entry_price = 0.0;
+        // Nudge last_trade_time back so ManageLayers can immediately open a new starter position
+        buyState.last_trade_time = TimeCurrent() - TRADE_COOLDOWN_SECONDS;
+        
+    } else // Reset SEL-side runtime 
+    {
+         sellState.sequence_active = false;
+         sellState.last_entry_price = 0.0;
+         // Nudge last_trade_time back so ManageLayers can immediately open a new starter position
+         sellState.last_trade_time = TimeCurrent() - TRADE_COOLDOWN_SECONDS;     
+    
+    }
+}
+
 void CloseAllBuys(ulong magic)
 {
     int total = PositionsTotal();
@@ -281,7 +340,7 @@ void CloseAllBuys(ulong magic)
         r.position = position_ticket;
         r.volume = vol;
         r.price = bid;
-        r.deviation = Slippage;
+        r.deviation = SmartDeviationPoints(_Symbol);
         r.magic = magic;
         if (OrderSend(r, res))
         {
@@ -327,7 +386,7 @@ void CloseAllSells(ulong magic)
         r.position = position_ticket;
         r.volume = vol;
         r.price = ask;
-        r.deviation = Slippage;
+        r.deviation = SmartDeviationPoints(_Symbol);
         r.magic = magic;
         if (OrderSend(r, res))
         {
@@ -367,8 +426,7 @@ void CheckProfitAndClose(const Stats &s, bool forBuy, ulong magic)
         double tg = 4.5 * BaseLots * 100;
         if (profit >= tg)
         {
-            CloseAllBuys(magic);
-            CloseAllSells(magic);
+            CloseAll();
             // Reset data
             InitMaxLostProfit();
             
@@ -384,8 +442,7 @@ void CheckProfitAndClose(const Stats &s, bool forBuy, ulong magic)
         Print("TARGET HIT profit=", DoubleToString(s.floatingProfit, 2),
               " target=", DoubleToString(target, 2));
 
-        CloseAllBuys(magic);
-        CloseAllSells(magic);
+        CloseAll();
 
         // Reset data
         InitMaxLostProfit();
