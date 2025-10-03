@@ -518,7 +518,9 @@ int OnInit()
             {
                 buyState.last_trade_time = TimeCurrent();
                 if (OpenBuy(BaseLots, MagicNumberBuy))
-                    buyState.sequence_active = true;
+                {
+                    // buyState.sequence_active = true;
+                }
             }
         }
         if (EnableSell)
@@ -529,7 +531,9 @@ int OnInit()
             {
                 sellState.last_trade_time = TimeCurrent();
                 if (OpenSell(BaseLots, MagicNumberSell))
-                    sellState.sequence_active = true;
+                {
+                    // sellState.sequence_active = true;
+                }
             }
         }
     }
@@ -566,7 +570,9 @@ void OnTick()
                 {
                     buyState.last_trade_time = TimeCurrent();
                     if (OpenBuy(BaseLots, MagicNumberBuy))
-                    // buyState.sequence_active = true;
+                    {
+                        // buyState.sequence_active = true;
+                    }
                 }
             }
             else
@@ -604,7 +610,9 @@ void OnTick()
                 {
                     sellState.last_trade_time = TimeCurrent();
                     if (OpenSell(BaseLots, MagicNumberSell))
-                    // sellState.sequence_active = true;
+                    {
+                        // sellState.sequence_active = true;
+                    }
                 }
             }
             else
