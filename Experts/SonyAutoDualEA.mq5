@@ -90,9 +90,6 @@ void CollectStats(Stats &s, bool forBuy, ulong magic)
     datetime newest = 0;
     int total = PositionsTotal();
 
-    // just for next stept in func NextVolume()
-    double previousVol = 0;
-
     for (int i = 0; i < total; i++)
     {
         ulong position_ticket = PositionGetTicket(i);
@@ -125,6 +122,7 @@ void CollectStats(Stats &s, bool forBuy, ulong magic)
         {
             newest = opentm;
             s.lastPrice = openPrice;
+            
             s.previousVol = s.lastVol;
             s.lastVol = vol;
         }
@@ -133,12 +131,6 @@ void CollectStats(Stats &s, bool forBuy, ulong magic)
 
 double NextVolume(const Stats &s)
 {
-
-    if (s.count <= 2)
-    {
-        return BaseLots;
-    }
-
     double nextVol = s.previousVol + s.lastVol;
     return nextVol;
 }
@@ -656,7 +648,6 @@ void OnTick()
                     double nv = NextVolume(s);
                     if (CanOpen(s, nv))
                     {
-                        Print("can open SELL:");
                         sellState.last_trade_time = TimeCurrent();
                         OpenSell(nv, MagicNumberSell);
                     }
