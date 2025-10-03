@@ -29,12 +29,6 @@ input bool AutoStartOnInit = true;
 input ulong MagicNumberBuy = 2025091901;
 input ulong MagicNumberSell = 2025091902;
 
-// Global ------
-// Globals
-double g_equity_peak = 0.0;
-double g_max_drawdown = 0.0;    // in account currency
-double g_min_floating_pl = 0.0; // most negative floating P/L
-
 //--- Global State per side
 struct SideState
 {
@@ -56,7 +50,6 @@ struct Stats
     double totalInvested;
     double floatingProfit;
     double lastPrice;
-    double previousVol;
     double lastVol;
 };
 
@@ -87,10 +80,6 @@ void CollectStats(Stats &s, bool forBuy, ulong magic)
     ZeroMemory(s);
     datetime newest = 0;
     int total = PositionsTotal();
-
-    // just for next stept in func NextVolume()
-    double previousVol = 0;
-
     for (int i = 0; i < total; i++)
     {
         ulong position_ticket = PositionGetTicket(i);
@@ -123,7 +112,6 @@ void CollectStats(Stats &s, bool forBuy, ulong magic)
         {
             newest = opentm;
             s.lastPrice = openPrice;
-            s.previousVol = s.lastVol;
             s.lastVol = vol;
         }
     }
@@ -131,14 +119,13 @@ void CollectStats(Stats &s, bool forBuy, ulong magic)
 
 double NextVolume(const Stats &s)
 {
-
-    if (s.count <= 1)
-    {
+    if (s.count == 0)
         return BaseLots;
-    }
-
-    double nextVol = s.previousVol + s.lastVol;
-    return nextVol;
+    if (s.count == 1)
+        return BaseLots;
+    if (s.count == 2)
+        return BaseLots * 2.0;
+    return s.lastVol * 2.0;
 }
 
 bool CanOpen(const Stats &s, double v)
@@ -218,7 +205,6 @@ bool OpenSell(double volume, ulong magic)
 
     if (!OrderSend(r, res))
     {
-        Print("Opened SELL ", DoubleToString(volume, 2), " @ ", DoubleToString(res.price, _Digits));
         Print("OPEN SELL ERROR 1: retcode_ex: ", res.retcode_external, " err: ", GetLastError());
         ResetLastError();
         ZeroMemory(r);
@@ -357,58 +343,35 @@ void CheckProfitAndClose(const Stats &s, bool forBuy, ulong magic)
         return;
 
     /// ---------OLD---------///
+    // double target = s.totalInvested * (ProfitTargetPercent / 100.0);
+    // if (s.floatingProfit >= target)
+    // {
+    //     Print("TARGET HIT profit=", DoubleToString(s.floatingProfit, 2),
+    //           " target=", DoubleToString(target, 2),
+    //           " TOTAL_INVEST=", DoubleToString(s.totalInvested, 2));
+    //     if (forBuy)
+    //         CloseAllBuys(magic);
+    //     else
+    //         CloseAllSells(magic);
+    // }
+
+    /// --------- OLD ----------- ////
+
+    // news stragtegy
 
     double invested = 0.0, profit = 0.0;
     int cnt = 0;
     bool isProfit = false;
     GetAllInvestStatus(invested, profit, cnt, isProfit);
 
-    if (!isProfit && cnt <= 2)
-        return;
-
-    if (isProfit && cnt <= 2)
+    if (isProfit)
     {
-        // 4.up $ it mean 4-5 times if 5 up mean must cnt bigger then 2
-        if (profit >= 4)
+        if (profit == BaseLots * 10)
         {
-            CloseAllBuys(magic);
-            CloseAllSells(magic);
-            // Reset data
-            InitMaxLostProfit();
+            CloseAllBuys(MagicNumberBuy);
+            CloseAllSells(MagicNumberSell);
         }
     }
-
-    double max_floating_loss_abs = (g_min_floating_pl < 0.0) ? -g_min_floating_pl : 0.0;
-    double target = max_floating_loss_abs * 0.25;
-    if (s.floatingProfit >= target)
-    {
-        PrintFormat("FP=%.2f, MaxDD=%.2f, MinFPL=%.2f", s.floatingProfit, g_max_drawdown, g_min_floating_pl);
-        Print("TARGET HIT profit=", DoubleToString(s.floatingProfit, 2),
-              " target=", DoubleToString(target, 2));
-
-        CloseAllBuys(magic);
-        CloseAllSells(magic);
-
-        // Reset data
-        InitMaxLostProfit();
-    }
-
-    /// --------- OLD ----------- ////
-
-    // news stragtegy
-    //    double invested = 0.0, profit = 0.0;
-    //    int cnt = 0;
-    //    bool isProfit = false;
-    //    GetAllInvestStatus(invested, profit, cnt, isProfit);
-    //
-    //    if (isProfit)
-    //    {
-    //        if (profit == BaseLots * 10)
-    //        {
-    //            CloseAllBuys(MagicNumberBuy);
-    //            CloseAllSells(MagicNumberSell);
-    //        }
-    //    }
 }
 
 void CloseWhenSinglePositionProfit(Stats &s, bool forBuy, ulong magic)
@@ -466,48 +429,12 @@ void OnTradeClose(ulong ticket)
     logger.LogTrade(type, lots, symbol, open_p, open_t, close_p, close_t, profit);
 }
 
-/// Check Profit during Trade
-void InitMaxLostProfit()
-{
-    double eq = AccountInfoDouble(ACCOUNT_EQUITY);
-    g_equity_peak = eq;
-    g_max_drawdown = 0.0;
-    g_min_floating_pl = 0.0;
-}
-
-/// Check Profit during Trade
-void checkMaxLostProfit()
-{
-    double eq = AccountInfoDouble(ACCOUNT_EQUITY);
-    double bal = AccountInfoDouble(ACCOUNT_BALANCE);
-    double fpl = eq - bal; // floating P/L across all open positions
-
-    // Track equity peak
-    if (eq > g_equity_peak)
-        g_equity_peak = eq;
-
-    // Update drawdown from peak
-    double dd = g_equity_peak - eq;
-    if (dd > g_max_drawdown)
-        g_max_drawdown = dd;
-
-    // Track worst floating P/L (most negative)
-    if (fpl < g_min_floating_pl)
-        g_min_floating_pl = fpl;
-
-    // Optional: print occasionally
-    // PrintFormat("FPL=%.2f, MaxDD=%.2f, MinFPL=%.2f", fpl, g_max_drawdown, g_min_floating_pl);
-}
-
 //+------------------------------------------------------------------+
 //| Expert initialization                                            |
 //+------------------------------------------------------------------+
 int OnInit()
 {
     Print("SonyAutoDualEA init.");
-
-    InitMaxLostProfit();
-
     if (AutoStartOnInit)
     {
         if (EnableBuy)
@@ -549,10 +476,6 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
 {
-
-    // Update profit max lost during Trading
-    checkMaxLostProfit();
-
     // BUY side management
     if (EnableBuy)
     {
@@ -566,7 +489,7 @@ void OnTick()
                 {
                     buyState.last_trade_time = TimeCurrent();
                     if (OpenBuy(BaseLots, MagicNumberBuy))
-                    // buyState.sequence_active = true;
+                        buyState.sequence_active = true;
                 }
             }
             else
@@ -604,7 +527,7 @@ void OnTick()
                 {
                     sellState.last_trade_time = TimeCurrent();
                     if (OpenSell(BaseLots, MagicNumberSell))
-                    // sellState.sequence_active = true;
+                        sellState.sequence_active = true;
                 }
             }
             else
