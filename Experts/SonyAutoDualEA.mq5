@@ -376,7 +376,7 @@ void CheckProfitAndClose(const Stats &s, bool forBuy, ulong magic)
     double target = max_floating_loss_abs * 0.25;
     if (s.floatingProfit >= target)
     {
-        PrintFormat("FP=%.2f, MaxDD=%.2f, MinFPL=%.2f", s.floatingProfit, g_max_drawdown, g_min_floating_pl);
+        PrintFormat("Foating Profit=%.2f, Max-FPL=%.2f", s.floatingProfit, max_floating_loss_abs);
         Print("TARGET HIT profit=", DoubleToString(s.floatingProfit, 2),
               " target=", DoubleToString(target, 2));
 
@@ -488,6 +488,7 @@ void checkMaxLostProfit()
     // Track worst floating P/L (most negative)
     if (fpl < g_min_floating_pl)
         g_min_floating_pl = fpl;
+        PrintFormat("Max float profit lost=%.2f", g_min_floating_pl);
 
     // Optional: print occasionally
     // PrintFormat("FPL=%.2f, MaxDD=%.2f, MinFPL=%.2f", fpl, g_max_drawdown, g_min_floating_pl);
