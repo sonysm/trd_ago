@@ -31,10 +31,6 @@ input ulong MagicNumberSell = 2025091902;
 
 // Global ------
 long accountId = (long)AccountInfoInteger(ACCOUNT_LOGIN);
-
-// Globals
-double g_equity_peak = 0.0;
-double g_max_drawdown = 0.0;    // in account currency
 double g_min_floating_pl = 0.0; // most negative floating P/L
 
 //--- Global State per side
@@ -79,6 +75,35 @@ double NormalizeVolume(double vol)
     vol = MathMax(vmin, MathMin(vol, vmax));
     vol = MathRound(vol / step) * step;
     return NormalizeDouble(vol, (int)MathRound(-log10(step)));
+}
+
+/// This mean  profit and state Include all [BUY and SELL]
+// [Note] we use Stats struct but use only Floating profit property only
+Stats CollectAllPositionState() {
+   Stats s;
+   ZeroMemory(s);
+   datetime newest = 0;
+   
+   int total = PositionsTotal();
+    for (int i = 0; i < total; i++)
+    {
+        ulong position_ticket = PositionGetTicket(i);
+        if (!PositionSelectByTicket(position_ticket))
+            continue;
+        
+        long magic = PositionGetInteger(POSITION_MAGIC);
+        if (magic != (long)MagicNumberBuy && magic != (long)MagicNumberSell)
+            continue;
+
+        if (PositionGetString(POSITION_SYMBOL) != _Symbol)
+            continue;
+
+        double profit = PositionGetDouble(POSITION_PROFIT);
+        s.floatingProfit += profit;
+
+    }
+    
+    return s;
 }
 
 //+------------------------------------------------------------------+
@@ -184,7 +209,7 @@ bool OpenBuy(double volume, ulong magic)
     }
     if (res.retcode != TRADE_RETCODE_DONE && res.retcode != TRADE_RETCODE_DONE_PARTIAL)
         return false;
-    Print("Opened BUY ", DoubleToString(volume, 2), " @ ", DoubleToString(res.price, _Digits));
+    Print("Opened BUY ", DoubleToString(volume, 2), " @ ", DoubleToString(res.price, _Digits), " Ticket=", IntegerToString(res.order));
     return true;
 }
 
@@ -408,15 +433,11 @@ void CloseAllSells(ulong magic)
 
 void CheckProfitAndClose(const Stats &s, bool forBuy, ulong magic)
 {
-    if (s.count == 0)
-        return;
-
-    /// ---------OLD---------///
-
-    double invested = 0.0, profit = 0.0;
+   
+    double invested = 0.0, floatingProfit = 0.0;
     int cnt = 0;
     bool isProfit = false;
-    GetAllInvestStatus(invested, profit, cnt, isProfit);
+    GetAllInvestStatus(invested, floatingProfit, cnt, isProfit);
 
     if (!isProfit && cnt <= 2)
         return;
@@ -426,7 +447,7 @@ void CheckProfitAndClose(const Stats &s, bool forBuy, ulong magic)
         // moment 4 times profit of lotsize
         // if 5 times other will create new record
         double tg = 4.5 * BaseLots * 100;
-        if (profit >= tg)
+        if (floatingProfit >= tg)
         {
             CloseAll();
             // Reset data
@@ -436,14 +457,15 @@ void CheckProfitAndClose(const Stats &s, bool forBuy, ulong magic)
         }
     }
 
-    double max_floating_loss_abs = (g_min_floating_pl < 0.0) ? -g_min_floating_pl : 0.0;
-    double target = max_floating_loss_abs * 0.25;
-    if (s.floatingProfit >= target)
+    //double max_floating_loss_abs = (g_min_floating_pl < 0.0) ? -g_min_floating_pl : 0.0;
+    //double target = max_floating_loss_abs * 0.25;
+    
+    double target = (floatingProfit - g_min_floating_pl) * 0.25;
+    
+    if (floatingProfit >= target)
     {
-        PrintFormat("Foating Profit=%.2f, Max-FPL=%.2f", s.floatingProfit, max_floating_loss_abs);
-        Print("TARGET HIT profit=", DoubleToString(s.floatingProfit, 2),
-              " target=", DoubleToString(target, 2));
-
+        PrintFormat("Foating Profit=%.2f, Max-FPL=%.2f, Taget=%.2f", floatingProfit, g_min_floating_pl, target);
+        
         CloseAll();
 
         // Reset data
@@ -526,9 +548,6 @@ void OnTradeClose(ulong ticket)
 /// Check Profit during Trade
 void InitMaxLostProfit()
 {
-    double eq = AccountInfoDouble(ACCOUNT_EQUITY);
-    g_equity_peak = eq;
-    g_max_drawdown = 0.0;
     g_min_floating_pl = 0.0;
 }
 
@@ -539,19 +558,12 @@ void checkMaxLostProfit()
     double bal = AccountInfoDouble(ACCOUNT_BALANCE);
     double fpl = eq - bal; // floating P/L across all open positions
 
-    // Track equity peak
-    if (eq > g_equity_peak)
-        g_equity_peak = eq;
-
-    // Update drawdown from peak
-    double dd = g_equity_peak - eq;
-    if (dd > g_max_drawdown)
-        g_max_drawdown = dd;
 
     // Track worst floating P/L (most negative)
-    if (fpl < g_min_floating_pl)
+    if (fpl < g_min_floating_pl) {
         g_min_floating_pl = fpl;
-        //PrintFormat("Max float profit lost=%.2f", g_min_floating_pl);
+        PrintFormat("Max float profit lost=%.2f", g_min_floating_pl);
+    }
 
     // Optional: print occasionally
     // PrintFormat("FPL=%.2f, MaxDD=%.2f, MinFPL=%.2f", fpl, g_max_drawdown, g_min_floating_pl);
