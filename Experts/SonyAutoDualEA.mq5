@@ -18,10 +18,9 @@ input bool EnableSell = true;
 input double BaseLots = 0.01;
 input double StepSize = 1.0;
 input int StepsPerLayer = 5;
-input double ProfitTargetPercent = 20.0;
-input int Slippage = 10;
+input double ProfitTargetPercent = 25.0;
 input int MaxOrders = 15;
-input double MaxTotalLots = 1.0;
+input double MaxTotalLots = 10.0;
 input bool AutoRestart = true;
 input bool AutoStartOnInit = true;
 
@@ -187,12 +186,13 @@ bool OpenBuy(double volume, ulong magic)
     r.type = ORDER_TYPE_BUY;
     r.volume = volume;
     r.price = ask;
-    r.deviation = Slippage;
+    r.deviation = SmartDeviationPoints(_Symbol);
     r.magic = magic;
     r.type_filling = ORDER_FILLING_FOK;
 
     if (!OrderSend(r, res))
     {
+      PrintFormat("ERROR OPEN BUY lotsize=%.2f price=%.2f", volume, ask);
         ResetLastError();
         ZeroMemory(r);
         ZeroMemory(res);
@@ -205,6 +205,7 @@ bool OpenBuy(double volume, ulong magic)
         r.magic = magic;
         r.type_filling = ORDER_FILLING_IOC;
         if (!OrderSend(r, res))
+            PrintFormat("ERROR OPEN BUY lotsize=%.2f price=%.2f", volume, ask);
             return false;
     }
     if (res.retcode != TRADE_RETCODE_DONE && res.retcode != TRADE_RETCODE_DONE_PARTIAL)
@@ -221,6 +222,8 @@ bool OpenSell(double volume, ulong magic)
     double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
     if (bid <= 0)
         return false;
+        
+    Print("why");
 
     MqlTradeRequest r;
     MqlTradeResult res;
@@ -460,7 +463,8 @@ void CheckProfitAndClose(const Stats &s, bool forBuy, ulong magic)
     //double max_floating_loss_abs = (g_min_floating_pl < 0.0) ? -g_min_floating_pl : 0.0;
     //double target = max_floating_loss_abs * 0.25;
     
-    double target = (floatingProfit - g_min_floating_pl) * 0.25;
+    // Profit percentage Exmple 25%
+    double target = (floatingProfit - g_min_floating_pl) * (ProfitTargetPercent / 100);
     
     if (floatingProfit >= target)
     {
