@@ -1,0 +1,7 @@
+*.ex5
+Logs/*
+Profiles/*
+Profiles/Tester/*
+
+*.dat
+*/experts.dat
