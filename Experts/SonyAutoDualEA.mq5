@@ -80,18 +80,19 @@ double NormalizeVolume(double vol)
 
 /// This mean  profit and state Include all [BUY and SELL]
 // [Note] we use Stats struct but use only Floating profit property only
-Stats CollectAllPositionState() {
-   Stats s;
-   ZeroMemory(s);
-   datetime newest = 0;
-   
-   int total = PositionsTotal();
+Stats CollectAllPositionState()
+{
+    Stats s;
+    ZeroMemory(s);
+    datetime newest = 0;
+
+    int total = PositionsTotal();
     for (int i = 0; i < total; i++)
     {
         ulong position_ticket = PositionGetTicket(i);
         if (!PositionSelectByTicket(position_ticket))
             continue;
-        
+
         long magic = PositionGetInteger(POSITION_MAGIC);
         if (magic != (long)MagicNumberBuy && magic != (long)MagicNumberSell)
             continue;
@@ -101,9 +102,8 @@ Stats CollectAllPositionState() {
 
         double profit = PositionGetDouble(POSITION_PROFIT);
         s.floatingProfit += profit;
-
     }
-    
+
     return s;
 }
 
@@ -113,8 +113,12 @@ Stats CollectAllPositionState() {
 void CollectStats(Stats &s, bool forBuy, ulong magic)
 {
     ZeroMemory(s);
-    datetime newest = 0;
     int total = PositionsTotal();
+
+    // Track the two largest volumes; if equal volume, prefer the newest by time
+    double maxVol1 = -1.0, maxVol2 = -1.0;
+    datetime maxTime1 = 0, maxTime2 = 0;
+    double maxVol1OpenPrice = 0.0;
 
     for (int i = 0; i < total; i++)
     {
@@ -144,14 +148,34 @@ void CollectStats(Stats &s, bool forBuy, ulong magic)
         s.totalInvested += vol * openPrice;
         s.floatingProfit += profit;
 
-        if (opentm > newest)
+        // Update top-2 volumes
+        if (vol > maxVol1 || (vol == maxVol1 && opentm > maxTime1))
         {
-            newest = opentm;
-            s.lastPrice = openPrice;
-            
-            s.previousVol = s.lastVol;
-            s.lastVol = vol;
+            // Shift current max to second
+            maxVol2 = maxVol1;
+            maxTime2 = maxTime1;
+
+            // Set new max
+            maxVol1 = vol;
+            maxTime1 = opentm;
+            maxVol1OpenPrice = openPrice;
         }
+        else if (vol > maxVol2 || (vol == maxVol2 && opentm > maxTime2))
+        {
+            maxVol2 = vol;
+            maxTime2 = opentm;
+        }
+    }
+
+    // Assign last/previous volumes and lastPrice based on largest lotsize
+    if (maxVol1 > 0.0)
+    {
+        s.lastVol = maxVol1;
+        s.lastPrice = maxVol1OpenPrice; // price of the position with biggest lotsize
+    }
+    if (maxVol2 > 0.0)
+    {
+        s.previousVol = maxVol2;
     }
 }
 
@@ -194,7 +218,7 @@ bool OpenBuy(double volume, ulong magic)
 
     if (!OrderSend(r, res))
     {
-      PrintFormat("ERROR OPEN BUY lotsize=%.2f price=%.2f", volume, ask);
+        PrintFormat("ERROR OPEN BUY lotsize=%.2f price=%.2f", volume, ask);
         ResetLastError();
         ZeroMemory(r);
         ZeroMemory(res);
@@ -208,7 +232,7 @@ bool OpenBuy(double volume, ulong magic)
         r.type_filling = ORDER_FILLING_IOC;
         if (!OrderSend(r, res))
             PrintFormat("ERROR OPEN BUY lotsize=%.2f price=%.2f", volume, ask);
-            return false;
+        return false;
     }
     if (res.retcode != TRADE_RETCODE_DONE && res.retcode != TRADE_RETCODE_DONE_PARTIAL)
         return false;
@@ -224,8 +248,6 @@ bool OpenSell(double volume, ulong magic)
     double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
     if (bid <= 0)
         return false;
-        
-    Print("why");
 
     MqlTradeRequest r;
     MqlTradeResult res;
@@ -285,30 +307,30 @@ int SmartDeviationPoints(string symbol, int min_points = 10, double spread_multi
 
 void CloseAll()
 {
-   // Hold new Position BUY temp
-   buyState.sequence_active = true;
-   
-   // Hold new Position SELL temp
-   sellState.sequence_active = true;
-   
+    // Hold new Position BUY temp
+    buyState.sequence_active = true;
+
+    // Hold new Position SELL temp
+    sellState.sequence_active = true;
+
     int total = PositionsTotal();
     for (int i = total - 1; i >= 0; --i)
     {
         ulong position_ticket = PositionGetTicket(i);
         if (!PositionSelectByTicket(position_ticket))
             continue;
-        
+
         // not my record
         long magic = PositionGetInteger(POSITION_MAGIC);
         if (magic != (long)MagicNumberBuy && magic != (long)MagicNumberSell)
             continue;
-         
+
         if (PositionGetString(POSITION_SYMBOL) != _Symbol)
             continue;
 
         double vol = PositionGetDouble(POSITION_VOLUME);
         double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-        
+
         long position_type = PositionGetInteger(POSITION_TYPE);
 
         MqlTradeRequest r;
@@ -329,19 +351,18 @@ void CloseAll()
             OnTradeClose(position_ticket);
         }
     } // for loop positions
-    
+
     // Reset BUY-side runtime state so EA can start a fresh sequence
     buyState.sequence_active = false;
     buyState.last_entry_price = 0.0;
     // Nudge last_trade_time back so ManageLayers can immediately open a new starter position
     buyState.last_trade_time = TimeCurrent() - TRADE_COOLDOWN_SECONDS;
-        
-     // Reset SEL-side runtime 
-     sellState.sequence_active = false;
-     sellState.last_entry_price = 0.0;
-     // Nudge last_trade_time back so ManageLayers can immediately open a new starter position
-     sellState.last_trade_time = TimeCurrent() - TRADE_COOLDOWN_SECONDS;  
-    
+
+    // Reset SEL-side runtime
+    sellState.sequence_active = false;
+    sellState.last_entry_price = 0.0;
+    // Nudge last_trade_time back so ManageLayers can immediately open a new starter position
+    sellState.last_trade_time = TimeCurrent() - TRADE_COOLDOWN_SECONDS;
 }
 
 void CloseAllBuys(ulong magic)
@@ -438,7 +459,7 @@ void CloseAllSells(ulong magic)
 
 void CheckProfitAndClose(const Stats &s, bool forBuy, ulong magic)
 {
-   
+
     double invested = 0.0, floatingProfit = 0.0;
     int cnt = 0;
     bool isProfit = false;
@@ -457,21 +478,21 @@ void CheckProfitAndClose(const Stats &s, bool forBuy, ulong magic)
             CloseAll();
             // Reset data
             InitMaxLostProfit();
-            
+
             return;
         }
     }
 
-    //double max_floating_loss_abs = (g_min_floating_pl < 0.0) ? -g_min_floating_pl : 0.0;
-    //double target = max_floating_loss_abs * 0.25;
-    
+    // double max_floating_loss_abs = (g_min_floating_pl < 0.0) ? -g_min_floating_pl : 0.0;
+    // double target = max_floating_loss_abs * 0.25;
+
     // Profit percentage Exmple 25%
     double target = (floatingProfit - g_min_floating_pl) * (ProfitTargetPercent / 100);
-    
+
     if (floatingProfit >= target)
     {
         PrintFormat("Foating Profit=%.2f, Max-FPL=%.2f, Taget=%.2f", floatingProfit, g_min_floating_pl, target);
-        
+
         CloseAll();
 
         // Reset data
@@ -564,9 +585,9 @@ void checkMaxLostProfit()
     double bal = AccountInfoDouble(ACCOUNT_BALANCE);
     double fpl = eq - bal; // floating P/L across all open positions
 
-
     // Track worst floating P/L (most negative)
-    if (fpl < g_min_floating_pl) {
+    if (fpl < g_min_floating_pl)
+    {
         g_min_floating_pl = fpl;
         PrintFormat("Max float profit lost=%.2f", g_min_floating_pl);
     }
@@ -690,12 +711,14 @@ void OnTick()
                     if (CanOpen(s, nv))
                     {
                         buyState.last_trade_time = TimeCurrent();
-                        if (OpenBuy(nv, MagicNumberBuy)) {
-                           /// Balancing Profit lose
-                           if (AutoBalancing) {
-                              OpenSell(BaseLots, MagicNumberSell);
-                           }
-                        } 
+                        if (OpenBuy(nv, MagicNumberBuy))
+                        {
+                            /// Balancing Profit lose
+                            if (AutoBalancing)
+                            {
+                                OpenSell(BaseLots, MagicNumberSell);
+                            }
+                        }
                     }
                 }
                 // CloseWhenSinglePositionProfit(s, true, MagicNumberBuy);
@@ -736,11 +759,13 @@ void OnTick()
                     if (CanOpen(s, nv))
                     {
                         sellState.last_trade_time = TimeCurrent();
-                        if (OpenSell(nv, MagicNumberSell)) {
-                           /// Balancing Profit lose
-                           if (AutoBalancing) {
-                            OpenBuy(BaseLots, MagicNumberBuy);
-                           }
+                        if (OpenSell(nv, MagicNumberSell))
+                        {
+                            /// Balancing Profit lose
+                            if (AutoBalancing)
+                            {
+                                OpenBuy(BaseLots, MagicNumberBuy);
+                            }
                         }
                     }
                 }
