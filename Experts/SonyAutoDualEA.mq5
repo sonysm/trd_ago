@@ -34,6 +34,9 @@ input ulong MagicNumberSell = 2025091902;
 long accountId = (long)AccountInfoInteger(ACCOUNT_LOGIN);
 double g_min_floating_pl = 0.0; // most negative floating P/L
 
+// Private variable
+const ulong MagicNumberHelp = 2025091903;
+
 //--- Global State per side
 struct SideState
 {
@@ -185,11 +188,11 @@ double NextVolume(const Stats &s)
     return nextVol;
 }
 
-bool CanOpen(const Stats &s, double v)
+bool CanOpen(const Stats &s, double volume)
 {
     if (s.count >= MaxOrders)
         return false;
-    if (s.totalVolume + v > MaxTotalLots)
+    if (s.totalVolume + volume > MaxTotalLots)
         return false;
     return true;
 }
@@ -322,7 +325,7 @@ void CloseAll()
 
         // not my record
         long magic = PositionGetInteger(POSITION_MAGIC);
-        if (magic != (long)MagicNumberBuy && magic != (long)MagicNumberSell)
+        if (magic != (long)MagicNumberBuy && magic != (long)MagicNumberSell && magic != (long)MagicNumberHelp)
             continue;
 
         if (PositionGetString(POSITION_SYMBOL) != _Symbol)
@@ -347,7 +350,7 @@ void CloseAll()
         r.magic = magic;
         if (OrderSend(r, res))
         {
-            Print("Closed BUY ticket ", position_ticket);
+            // Print("Closed BUY ticket ", position_ticket);
             OnTradeClose(position_ticket);
         }
     } // for loop positions
@@ -498,23 +501,6 @@ void CheckProfitAndClose(const Stats &s, bool forBuy, ulong magic)
         // Reset data
         InitMaxLostProfit();
     }
-
-    /// --------- OLD ----------- ////
-
-    // news stragtegy
-    //    double invested = 0.0, profit = 0.0;
-    //    int cnt = 0;
-    //    bool isProfit = false;
-    //    GetAllInvestStatus(invested, profit, cnt, isProfit);
-    //
-    //    if (isProfit)
-    //    {
-    //        if (profit == BaseLots * 10)
-    //        {
-    //            CloseAllBuys(MagicNumberBuy);
-    //            CloseAllSells(MagicNumberSell);
-    //        }
-    //    }
 }
 
 void CloseWhenSinglePositionProfit(Stats &s, bool forBuy, ulong magic)
@@ -545,13 +531,15 @@ void CloseWhenSinglePositionProfit(Stats &s, bool forBuy, ulong magic)
 
 void GetAllInvestStatus(double &totalInvested, double &floatingProfit, int &positionsCount, bool &isProfit)
 {
-    Stats sb, ss;
+    // sh state help magic number
+    Stats sb, ss, sh;
     CollectStats(sb, true, MagicNumberBuy);
     CollectStats(ss, false, MagicNumberSell);
+    CollectStats(sh, false, MagicNumberHelp);
 
-    positionsCount = sb.count + ss.count;
-    totalInvested = sb.totalInvested + ss.totalInvested;
-    floatingProfit = sb.floatingProfit + ss.floatingProfit;
+    positionsCount = sb.count + ss.count + sh.count;
+    totalInvested = sb.totalInvested + ss.totalInvested + sh.totalInvested;
+    floatingProfit = sb.floatingProfit + ss.floatingProfit + sh.floatingProfit;
     isProfit = (floatingProfit >= 0.0);
 }
 
@@ -640,10 +628,7 @@ int OnInit()
             if (sb.count == 0)
             {
                 buyState.last_trade_time = TimeCurrent();
-                if (OpenBuy(BaseLots, MagicNumberBuy))
-                {
-                    // buyState.sequence_active = true;
-                }
+                OpenBuy(BaseLots, MagicNumberBuy);
             }
         }
         if (EnableSell)
@@ -653,10 +638,7 @@ int OnInit()
             if (ss.count == 0)
             {
                 sellState.last_trade_time = TimeCurrent();
-                if (OpenSell(BaseLots, MagicNumberSell))
-                {
-                    // sellState.sequence_active = true;
-                }
+                OpenSell(BaseLots, MagicNumberSell);
             }
         }
     }
@@ -692,10 +674,7 @@ void OnTick()
                 if (!buyState.sequence_active && AutoStartOnInit)
                 {
                     buyState.last_trade_time = TimeCurrent();
-                    if (OpenBuy(BaseLots, MagicNumberBuy))
-                    {
-                        // buyState.sequence_active = true;
-                    }
+                    OpenBuy(BaseLots, MagicNumberBuy);
                 }
             }
             else
@@ -716,7 +695,7 @@ void OnTick()
                             /// Balancing Profit lose
                             if (AutoBalancing)
                             {
-                                OpenSell(BaseLots, MagicNumberSell);
+                                OpenSell(BaseLots, MagicNumberHelp);
                             }
                         }
                     }
@@ -739,10 +718,7 @@ void OnTick()
                 if (!sellState.sequence_active && AutoStartOnInit)
                 {
                     sellState.last_trade_time = TimeCurrent();
-                    if (OpenSell(BaseLots, MagicNumberSell))
-                    {
-                        // sellState.sequence_active = true;
-                    }
+                    OpenSell(BaseLots, MagicNumberSell);
                 }
             }
             else
@@ -764,7 +740,7 @@ void OnTick()
                             /// Balancing Profit lose
                             if (AutoBalancing)
                             {
-                                OpenBuy(BaseLots, MagicNumberBuy);
+                                OpenBuy(BaseLots, MagicNumberHelp);
                             }
                         }
                     }
