@@ -1,7 +1,11 @@
-*.ex5
 Logs/*
 Profiles/*
 Profiles/Tester/*
+Tester/Logs/
+Tester/cache/
+Tester/history/
 
 *.dat
+*.ex5
+*.ex4
 */experts.dat
