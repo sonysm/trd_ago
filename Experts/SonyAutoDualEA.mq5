@@ -537,11 +537,11 @@ void CloseWhenSinglePositionProfit(Stats &s, bool forBuy, ulong magic)
 void GetAllInvestStatus(double &totalInvested, double &floatingProfit, int &positionsCount, bool &isProfit)
 {
     // sh state help magic number
-    State allS = CollectAllPositionState();
+    Stats allS = CollectAllPositionState();
 
-    positionsCount = allS.count;
-    totalInvested = allS.totalInvested;
-    floatingProfit = allS.floatingProfit;
+    positionsCount   = allS.count;
+    totalInvested    = allS.totalInvested;
+    floatingProfit   = allS.floatingProfit;
     isProfit = (floatingProfit >= 0.0);
 }
 
