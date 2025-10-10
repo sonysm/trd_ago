@@ -81,7 +81,8 @@ double NormalizeVolume(double vol)
     return NormalizeDouble(vol, (int)MathRound(-log10(step)));
 }
 
-/// This mean  profit and state Include all [BUY and SELL]
+/// This mean  profit and state Include all [BUY, SELL and HELP]
+/// total [invest] all and [count] all
 // [Note] we use Stats struct but use only Floating profit property only
 Stats CollectAllPositionState()
 {
@@ -97,14 +98,18 @@ Stats CollectAllPositionState()
             continue;
 
         long magic = PositionGetInteger(POSITION_MAGIC);
-        if (magic != (long)MagicNumberBuy && magic != (long)MagicNumberSell)
+        if (magic != (long)MagicNumberBuy && magic != (long)MagicNumberSell && magic != (long)MagicNumberHelp)
             continue;
 
         if (PositionGetString(POSITION_SYMBOL) != _Symbol)
             continue;
 
+        double vol = PositionGetDouble(POSITION_VOLUME);
+        double openPrice = PositionGetDouble(POSITION_PRICE_OPEN);
         double profit = PositionGetDouble(POSITION_PROFIT);
         s.floatingProfit += profit;
+        s.count += 1;
+        s.totalInvested = vol * openPrice;
     }
 
     return s;
@@ -464,14 +469,14 @@ void CheckProfitAndClose(const Stats &s, bool forBuy, ulong magic)
 {
 
     double invested = 0.0, floatingProfit = 0.0;
-    int cnt = 0;
+    int positionCount = 0;
     bool isProfit = false;
-    GetAllInvestStatus(invested, floatingProfit, cnt, isProfit);
+    GetAllInvestStatus(invested, floatingProfit, positionCount, isProfit);
 
-    if (!isProfit && cnt <= 2)
+    if (!isProfit && positionCount <= 2)
         return;
 
-    if (isProfit && cnt <= 2)
+    if (isProfit && positionCount <= 2)
     {
         // moment 4 times profit of lotsize
         // if 5 times other will create new record
@@ -532,14 +537,11 @@ void CloseWhenSinglePositionProfit(Stats &s, bool forBuy, ulong magic)
 void GetAllInvestStatus(double &totalInvested, double &floatingProfit, int &positionsCount, bool &isProfit)
 {
     // sh state help magic number
-    Stats sb, ss, sh;
-    CollectStats(sb, true, MagicNumberBuy);
-    CollectStats(ss, false, MagicNumberSell);
-    CollectStats(sh, false, MagicNumberHelp);
+    State allS = CollectAllPositionState();
 
-    positionsCount = sb.count + ss.count + sh.count;
-    totalInvested = sb.totalInvested + ss.totalInvested + sh.totalInvested;
-    floatingProfit = sb.floatingProfit + ss.floatingProfit + sh.floatingProfit;
+    positionsCount = allS.count;
+    totalInvested = allS.totalInvested;
+    floatingProfit = allS.floatingProfit;
     isProfit = (floatingProfit >= 0.0);
 }
 
