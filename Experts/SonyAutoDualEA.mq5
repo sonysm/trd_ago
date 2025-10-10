@@ -476,10 +476,7 @@ void CheckProfitAndClose(const Stats &s, bool forBuy, ulong magic)
     int positionCount = allS.count;
     bool isProfit = (floatingProfit > 0);
 
-    if (!isProfit)
-        return;
-
-    if (!isProfit && positionCount <= 2)
+    if (!isProfit || positionCount <= 2)
         return;
 
     if (isProfit && positionCount <= 2)
