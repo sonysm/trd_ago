@@ -468,12 +468,15 @@ void CloseAllSells(ulong magic)
 void CheckProfitAndClose(const Stats &s, bool forBuy, ulong magic)
 {
 
-    double invested = 0.0, floatingProfit = 0.0;
-    int positionCount = 0;
-    bool isProfit = false;
-    GetAllInvestStatus(invested, floatingProfit, positionCount, isProfit);
+    // All state include help magic number
+    Stats allS = CollectAllPositionState();
 
-    if (!isProfit && positionCount <= 2)
+    double invested = allS.totalInvested;
+    double floatingProfit = allS.floatingProfit;
+    int positionCount = allS.count;
+    bool isProfit = (floatingProfit > 0);
+
+    if (!isProfit || positionCount <= 2)
         return;
 
     if (isProfit && positionCount <= 2)
@@ -532,17 +535,6 @@ void CloseWhenSinglePositionProfit(Stats &s, bool forBuy, ulong magic)
         else
             CloseAllSells(magic);
     }
-}
-
-void GetAllInvestStatus(double &totalInvested, double &floatingProfit, int &positionsCount, bool &isProfit)
-{
-    // sh state help magic number
-    Stats allS = CollectAllPositionState();
-
-    positionsCount   = allS.count;
-    totalInvested    = allS.totalInvested;
-    floatingProfit   = allS.floatingProfit;
-    isProfit = (floatingProfit >= 0.0);
 }
 
 //--- Example function: log trade on position close
