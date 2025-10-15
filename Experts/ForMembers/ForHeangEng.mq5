@@ -39,6 +39,9 @@ input ulong MagicNumberSell = 2025091902;
 long accountId = (long)AccountInfoInteger(ACCOUNT_LOGIN);
 double g_min_floating_pl = 0.0; // most negative floating P/L
 
+double RandomStepArr[] = {6.0, 6.5, 7.0};
+double RandomProfitArr[] = {40.0, 40.5, 50.0};
+
 //--- Global State per side
 struct SideState
 {
@@ -492,11 +495,18 @@ void CheckProfitAndClose(const Stats &s, bool forBuy, ulong magic)
     // double target = max_floating_loss_abs * 0.25;
 
     // Profit percentage Exmple 25%
-    double target = (floatingProfit - g_min_floating_pl) * (ProfitTargetPercent / 100);
+    
+    
+    // Random
+    int idx = MathRand() % ArraySize(RandomProfitArr);
+    double _tempTarget = RandomProfitArr[idx];
+    // Random
+    
+    double _target = (floatingProfit - g_min_floating_pl) * (_tempTarget / 100);
 
-    if (floatingProfit >= target)
+    if (floatingProfit >= _target)
     {
-        PrintFormat("Foating Profit=%.2f, Max-FPL=%.2f, Taget=%.2f", floatingProfit, g_min_floating_pl, target);
+        PrintFormat("Foating Profit=%.2f, Max-FPL=%.2f, Taget=%.2f", floatingProfit, g_min_floating_pl, _target);
 
         CloseAll();
 
@@ -632,8 +642,11 @@ bool LoadState(long magic, double &equity_peak, double &worst_fpl)
 //+------------------------------------------------------------------+
 int OnInit()
 {
-    Print("SonyAutoDualEA init.");
-
+    Print("Heang-Eng init.");
+    
+    // For random array
+    MathSrand((uint)TimeLocal());
+    
     InitMaxLostProfit();
 
     if (AutoStartOnInit)
@@ -708,7 +721,13 @@ void OnTick()
                 // Layer logic for BUY: adverse when price falls
                 buyState.last_entry_price = s.lastPrice;
                 double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-                double adverse_threshold = StepsPerLayer;
+                
+                /// Random Step size [5-7]
+                int idx = MathRand() % ArraySize(RandomStepArr);
+                double _StepPerLayer = RandomStepArr[idx];
+                double adverse_threshold = _StepPerLayer;
+                ///
+                
                 double adverse_movement = buyState.last_entry_price - bid;
                 if (adverse_movement >= adverse_threshold)
                 {
@@ -755,7 +774,14 @@ void OnTick()
                 // Layer logic for SELL: adverse when price rises
                 sellState.last_entry_price = s.lastPrice;
                 double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
-                double adverse_threshold = StepsPerLayer;
+                
+                
+                /// Random Step size [5-7]
+                int idx = MathRand() % ArraySize(RandomStepArr);
+                double _StepPerLayer = RandomStepArr[idx];
+                double adverse_threshold = _StepPerLayer;
+                ///
+                
                 double adverse_movement = ask - sellState.last_entry_price;
 
                 if (adverse_movement >= adverse_threshold)
