@@ -19,8 +19,8 @@ input double BaseLots = 0.01;
 input double StepSize = 1.0;
 input int StepsPerLayer = 5;
 input double ProfitTargetPercent = 25.0;
-input int MaxOrders = 15;
-input double MaxTotalLots = 10.0;
+input int MaxOrders = 100;
+input double MaxTotalLots = 20.0;
 input bool AutoBalancing = true;
 
 input bool AutoRestart = true;
