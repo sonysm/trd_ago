@@ -39,8 +39,8 @@ input ulong MagicNumberSell = 2025091902;
 long accountId = (long)AccountInfoInteger(ACCOUNT_LOGIN);
 double g_min_floating_pl = 0.0; // most negative floating P/L
 
-double RandomStepArr[] = {6.0, 6.5, 7.0};
-double RandomProfitArr[] = {40.0, 40.5, 50.0};
+double RandomStepArr[] = {5.0, 6.0, 6.5, 7.0};
+double RandomProfitArr[] = {20.0, 20.0, 20.0, 25.0, 30.0, 40.0};
 
 //--- Global State per side
 struct SideState
