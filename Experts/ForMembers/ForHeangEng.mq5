@@ -32,15 +32,15 @@ input bool AutoRestart = true;
 input bool AutoStartOnInit = true;
 
 //--- Magic numbers (distinct per side)
-input ulong MagicNumberBuy = 2025091901;
-input ulong MagicNumberSell = 2025091902;
+ulong MagicNumberBuy = 2025091901;
+ulong MagicNumberSell = 2025091902;
 
 // Global ------
-long accountId = (long)AccountInfoInteger(ACCOUNT_LOGIN);
+//long accountId = (long)AccountInfoInteger(ACCOUNT_LOGIN);
 double g_min_floating_pl = 0.0; // most negative floating P/L
 
-double RandomStepArr[] = {5.0, 6.0, 6.5, 7.0};
-double RandomProfitArr[] = {20.0, 20.0, 20.0, 25.0, 30.0, 40.0};
+double RandomStepArr[] =   {5.0, 5.0, 6.0, 6.2, 6.5, 6.5, 6.7, 6.7, 7.0};
+double RandomProfitArr[] = {10.0, 10.0, 15.0, 20.0, 20.0, 25.0, 30.0, 40.0};
 
 //--- Global State per side
 struct SideState

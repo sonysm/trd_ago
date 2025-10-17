@@ -4,7 +4,7 @@
 #property strict
 #property version "1.00"
 
-// #include <Trade\Trade.mqh>
+#include <Trade\Trade.mqh>
 
 // Logger include (always enabled)
 #include <SonyTradeLogger.mqh>
@@ -18,8 +18,8 @@ input double BaseLots = 0.01;
 input double StepSize = 1.0;
 input int StepsPerLayer = 5;
 input double ProfitTargetPercent = 25.0;
-input int MaxOrders = 100;
-input double MaxTotalLots = 20.0;
+input int MaxOrders = 15;
+input double MaxTotalLots = 10.0;
 input bool AutoBalancing = true;
 
 input bool AutoRestart = true;
@@ -50,12 +50,12 @@ struct SideState
 SideState buyState = {0.0, false, 0};
 SideState sellState = {0.0, false, 0};
 
-const int TRADE_COOLDOWN_SECONDS = 3; // Wait 5 seconds after a trade attempt
+const int TRADE_COOLDOWN_SECONDS = 2; // Wait 5 seconds after a trade attempt
 
 SonyTradeLogger logger(TradeLogAPI_URL, WebRequestTimeout);
 
 // Close Trade
-// CTrade trade;
+CTrade trade;
 
 struct Stats
 {
@@ -349,26 +349,29 @@ void CloseAll()
 
         long position_type = PositionGetInteger(POSITION_TYPE);
 
-        MqlTradeRequest r;
-        MqlTradeResult res;
-        ZeroMemory(r);
-        ZeroMemory(res);
-        r.action = TRADE_ACTION_DEAL;
-        r.symbol = _Symbol;
-        r.type = position_type == POSITION_TYPE_BUY ? ORDER_TYPE_SELL : ORDER_TYPE_BUY;
-        r.position = position_ticket;
-        r.volume = vol;
-        r.price = bid;
-        r.deviation = SmartDeviationPoints(_Symbol);
-        r.magic = magic;
-        if (OrderSend(r, res))
+        //MqlTradeRequest r;
+        //MqlTradeResult res;
+        //ZeroMemory(r);
+        //ZeroMemory(res);
+        //r.action = TRADE_ACTION_DEAL;
+        //r.symbol = _Symbol;
+        //r.type = position_type == POSITION_TYPE_BUY ? ORDER_TYPE_SELL : ORDER_TYPE_BUY;
+        //r.position = position_ticket;
+        //r.volume = vol;
+        //r.price = bid;
+        //r.deviation = SmartDeviationPoints(_Symbol);
+        //r.magic = magic;
+        //if (OrderSend(r, res))
+        //{
+        //    // Print("Closed BUY ticket ", position_ticket);
+        //    OnTradeClose(position_ticket);
+        //}
+        
+        // close by ticket
+        if (trade.PositionCloseBy(position_ticket))
         {
-            // Print("Closed BUY ticket ", position_ticket);
             OnTradeClose(position_ticket);
         }
-        
-        // Sleep 100ms for Prevent Flooding server
-        Sleep(100);
         
     } // for loop positions
 
